@@ -1,5 +1,5 @@
 //import PropTypes from 'prop-types'
-import React, { Component } from 'react';
+import React, { useState } from 'react';
 import { GlobalStyle } from './GlobalStyle';
 import { Layout } from './Layout/Layout';
 import { Section } from './Section/Section';
@@ -10,6 +10,8 @@ import 'react-toastify/dist/ReactToastify.css';
 import { ContactList } from './ContactList/ContactList';
 import { Header } from './Header/Header';
 import Filter from './Filter/Filter';
+import useLocaStorage from 'hooks/useLocalStorage';
+import { nanoid } from 'nanoid';
 
 const notifyOptions = {
   position: 'bottom-left',
@@ -22,61 +24,56 @@ const notifyOptions = {
   theme: 'colored',
 };
 
-export default class App extends Component {
-  state = {
-    contacts: initialContacts,
-    filter: '',
-  };
+export default function App() {
+  const [contacts, setContacts] = useLocaStorage('contacts', initialContacts);
+  const [filter, setFilter] = useState('');
 
-  addContact = newContact => {
-    this.state.contacts.filter(
-      contact =>
-        contact.name.toLowerCase().trim() ===
-          newContact.name.toLowerCase().trim() ||
-        contact.number.trim() === newContact.number.trim()
-    ).length
-      ? toast.error(`${newContact.name}: is already in contacts`, notifyOptions)
-      : this.setState(prevState => {
-          return {
-            contacts: [newContact, ...prevState.contacts],
-          };
-        });
-  };
+  const addContact = newContact => {
 
-  deleteContact = contactId => {
-    this.setState(prevState => {
-      return {
-        contacts: prevState.contacts.filter(
-          contact => contact.id !== contactId
-        ),
-      };
-    });
-  };
-
-  changeFilter = e => {
-    this.setState({ filter: e.currentTarget.value.toLowerCase() });
-  };
-
-  getVisibleContacts = () => {
-    const { filter, contacts } = this.state;
-    const normalizedFilter = filter.toLowerCase();
-    return contacts.filter(contact =>
-      contact.name.toLowerCase().includes(normalizedFilter)
+    const isExist = contacts.some(
+      ({ name, number }) => name.toLowerCase().trim() === newContact.name.toLowerCase().trim() ||
+        number.trim() === newContact.number.trim()
     );
+
+    if (isExist) {
+      return toast.error(`${newContact.name}: is already in contacts`, notifyOptions)
+    }
+     
+    setContacts(contacts => [{ ...newContact, id: nanoid() }, ...contacts]);
   };
 
-  render() {
-    const { filter } = this.state;
-    const visibleContacts = this.getVisibleContacts();
+  const deleteContact = contactId => {
+    setContacts(contacts.filter(contact => contact.id !== contactId));
+  };
+
+  const changeFilter = e => {
+    setFilter(e.target.value.toLowerCase().trim());
+  };
+
+  const getVisibleContacts = () => {
+    const normalizedFilter = filter.toLowerCase();
+
+    const filteredContact = contacts.filter(contact =>
+      contact.name.toLowerCase().trim().includes(normalizedFilter)
+    );
+
+    if (normalizedFilter && !filteredContact.length) {
+      toast.warn(`No contacts matching your request`, notifyOptions);
+    }
+
+    return filteredContact;
+  };
+
+ 
     return (
       <Layout>
         <Section title="Phonebook">
-          <ContactForm onAddContact={this.addContact} />
+          <ContactForm onAddContact={addContact} />
           <Header title="Contacts" />
-          <Filter value={filter} onChange={this.changeFilter} />
+          <Filter value={filter} onChange={changeFilter} />
           <ContactList
-            contacts={visibleContacts}
-            onDelete={this.deleteContact}
+            contacts={getVisibleContacts()}
+            onDelete={deleteContact}
           />
         </Section>
         <ToastContainer />
@@ -84,4 +81,3 @@ export default class App extends Component {
       </Layout>
     );
   }
-}
